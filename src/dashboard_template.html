@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Digit Lab</title>
+<style>
+  :root { color-scheme: light; --bg:#f7f7f5; --card:#ffffff; --ink:#111; --ink2:#4d4d4d; --muted:#8c8c8c; --rule:#e2e2df;
+          --acc:#008300; --acc2:#e87ba4; --accText:#ffffff; --cellLo:#f4faf4; }
+  @media (prefers-color-scheme: dark) { :root:where(:not([data-theme="light"])) { color-scheme: dark; --bg:#121212; --card:#1c1c1c;
+          --ink:#f2f2f2; --ink2:#c4c4c4; --muted:#8c8c8c; --rule:#333; --acc:#2fa52f; --acc2:#d55181; --cellLo:#1f2a1f; } }
+  :root[data-theme="dark"] { color-scheme: dark; --bg:#121212; --card:#1c1c1c; --ink:#f2f2f2; --ink2:#c4c4c4; --muted:#8c8c8c;
+          --rule:#333; --acc:#2fa52f; --acc2:#d55181; --cellLo:#1f2a1f; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family: Calibri, Carlito, "Segoe UI", sans-serif; }
+  .top { padding:18px 22px 6px; }
+  .top h1 { margin:0; font-size:22px; font-weight:600; }
+  .top p { margin:4px 0 0; color:var(--ink2); font-size:13.5px; }
+  .wrap { display:grid; grid-template-columns: 360px minmax(0,1fr); gap:14px; padding:12px 22px 20px; }
+  .card { background:var(--card); border:1px solid var(--rule); border-radius:12px; padding:14px 16px; min-width:0; }
+  .card h2 { margin:0 0 4px; font-size:15px; font-weight:600; }
+  .card .hint { margin:0 0 10px; font-size:12.5px; color:var(--ink2); }
+  #pad { width:100%; aspect-ratio:1; border:1px dashed var(--muted); border-radius:8px; touch-action:none; cursor:crosshair; background:#fff; display:block; }
+  .row { display:flex; gap:8px; align-items:center; margin-top:10px; flex-wrap:wrap; }
+  button { font:inherit; font-size:13.5px; border:1px solid var(--rule); background:var(--card); color:var(--ink); border-radius:8px; padding:5px 12px; cursor:pointer; }
+  button.on { background:var(--acc); border-color:var(--acc); color:var(--accText); }
+  .guess { font-size:56px; font-weight:700; line-height:1; color:var(--acc); min-width:44px; }
+  .small { font-size:12.5px; color:var(--ink2); }
+  .nbrs { display:flex; gap:6px; margin-top:8px; }
+  .thumb { width:46px; height:46px; image-rendering:pixelated; border:1px solid var(--rule); border-radius:4px; background:#fff; }
+  .filters { display:flex; gap:14px; flex-wrap:wrap; align-items:flex-end; margin-bottom:10px; }
+  .filters label { display:block; font-size:11.5px; color:var(--ink2); margin-bottom:3px; }
+  select, input[type=range] { font:inherit; font-size:13.5px; }
+  select { padding:4px 6px; border:1px solid var(--rule); border-radius:6px; background:var(--card); color:var(--ink); }
+  .grid2 { display:grid; grid-template-columns: minmax(0,1fr) 300px; gap:14px; }
+  .gallery { display:grid; grid-template-columns: repeat(auto-fill, minmax(62px, 1fr)); gap:6px; max-height:420px; overflow:auto; padding-right:4px; }
+  .tile { border:1px solid var(--rule); border-radius:6px; padding:3px; text-align:center; cursor:pointer; font-size:11.5px; color:var(--ink2); background:var(--card); }
+  .tile.bad { border-color:var(--acc2); color:var(--acc2); font-weight:700; }
+  .tile.sel { outline:2px solid var(--acc); }
+  .tile canvas { width:52px; height:52px; image-rendering:pixelated; display:block; margin:0 auto 2px; background:#fff; border-radius:3px; }
+  table.cm { border-collapse:collapse; font-size:12px; font-variant-numeric:tabular-nums; }
+  table.cm td, table.cm th { width:25px; height:23px; text-align:center; border:1px solid var(--rule); }
+  table.cm td { cursor:pointer; }
+  table.cm td.diag { background:var(--cellLo); color:var(--ink); }
+  table.cm td.off { background:var(--acc2); color:#fff; font-weight:700; }
+  table.cm td.pick { outline:2px solid var(--ink); }
+  .bars { margin-top:10px; }
+  .bar { display:grid; grid-template-columns: 14px minmax(0,1fr) 46px; gap:6px; align-items:center; font-size:12px; margin:2px 0; }
+  .bar i { display:block; height:9px; border-radius:2px; background:var(--muted); }
+  .bar i.top { background:var(--acc); }
+  #tip { font-size:12.5px; color:var(--ink2); margin-top:6px; }
+  @media (max-width:900px) { .wrap { grid-template-columns:1fr; } .grid2 { grid-template-columns:1fr; } .top, .wrap { padding-left:16px; padding-right:16px; } }
+</style>
+</head>
+<body>
+<div class="top">
+  <h1>Digit Lab: handwritten digit explorer</h1>
+  <p>Interact stage (Fry). UCI Optical Recognition of Handwritten Digits, 8 x 8 block counts. Vinith A (25ADL10), U21ADP05 Assignment II.</p>
+</div>
+<div class="wrap">
+  <div class="card">
+    <h2>Draw a digit</h2>
+    <p class="hint">Draw large and centred. Your drawing is cropped, scaled to 32 x 32, cut into 4 x 4 blocks (exactly like the UCI preprocessing) and matched against the 3,823 training images (3-nearest-neighbour vote).</p>
+    <canvas id="pad" width="256" height="256"></canvas>
+    <div class="row"><button id="clear">Clear</button><span class="small">Stroke width</span><input id="pen" type="range" min="10" max="34" value="22"></div>
+    <div class="row" style="margin-top:14px"><div class="guess" id="guess">-</div>
+      <div><div class="small" id="vote">Draw something to classify.</div><div class="small">What the model sees (8 x 8):</div><canvas id="seen" class="thumb" width="8" height="8"></canvas></div></div>
+    <div class="small" style="margin-top:8px">Nearest training images:</div>
+    <div class="nbrs" id="nbrs"></div>
+  </div>
+  <div class="card">
+    <h2>CNN on the writer-independent test set</h2>
+    <p class="hint">1,797 images written by 13 people the network never saw. Pink tiles are mistakes. Click a tile for its class probabilities, or click a confusion-matrix cell to filter.</p>
+    <div class="filters">
+      <div><label for="fTrue">True digit</label><select id="fTrue"><option value="all">All</option></select></div>
+      <div><label for="fPred">Predicted digit</label><select id="fPred"><option value="all">All</option></select></div>
+      <div><label>Show</label><span id="seg"><button data-v="all" class="on">All</button> <button data-v="bad">Errors only</button></span></div>
+      <div><label for="fConf">Max confidence: <b id="confV">100%</b></label><input id="fConf" type="range" min="30" max="100" value="100"></div>
+      <div class="small" id="count"></div>
+    </div>
+    <div class="grid2">
+      <div class="gallery" id="gallery"></div>
+      <div>
+        <table class="cm" id="cm"></table>
+        <div id="tip">Rows: true digit. Columns: predicted digit.</div>
+        <div class="bars" id="bars"></div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+const THEME = new URLSearchParams(location.search).get("theme");
+if (THEME === "light" || THEME === "dark") document.documentElement.setAttribute("data-theme", THEME);
+const D = /*__DATA__*/null;
+const S = { t: "all", p: "all", bad: false, maxc: 1, sel: null };
+const nTest = D.test_y.length;
+const pred = D.test_p.map(r => r.indexOf(Math.max(...r)));
+const conf = D.test_p.map(r => Math.max(...r));
+function paint(cv, px) {           // px: 64 counts 0..16
+  const g = cv.getContext("2d"), im = g.createImageData(8, 8);
+  for (let i = 0; i < 64; i++) { const v = 255 - Math.round(px[i] / 16 * 255); im.data[4*i] = v; im.data[4*i+1] = v; im.data[4*i+2] = v; im.data[4*i+3] = 255; }
+  g.putImageData(im, 0, 0);
+}
+// ---------------------------------------------------------------- confusion matrix
+function drawCM() {
+  const cm = Array.from({length: 10}, () => new Array(10).fill(0));
+  for (let i = 0; i < nTest; i++) cm[D.test_y[i]][pred[i]]++;
+  let h = "<tr><th></th>" + [...Array(10).keys()].map(j => `<th>${j}</th>`).join("") + "</tr>";
+  for (let i = 0; i < 10; i++) {
+    h += `<tr><th>${i}</th>`;
+    for (let j = 0; j < 10; j++) {
+      const v = cm[i][j], cls = i === j ? "diag" : (v ? "off" : "");
+      const pick = (String(i) === S.t && String(j) === S.p) ? " pick" : "";
+      h += `<td class="${cls}${pick}" data-t="${i}" data-p="${j}" title="true ${i}, predicted ${j}: ${v}">${v || ""}</td>`;
+    }
+    h += "</tr>";
+  }
+  const t = document.getElementById("cm"); t.innerHTML = h;
+  t.querySelectorAll("td").forEach(td => td.onclick = () => {
+    S.t = td.dataset.t; S.p = td.dataset.p; document.getElementById("fTrue").value = S.t; document.getElementById("fPred").value = S.p; render();
+  });
+}
+// ---------------------------------------------------------------- gallery
+function render() {
+  const g = document.getElementById("gallery"); g.innerHTML = "";
+  let shown = 0;
+  for (let i = 0; i < nTest; i++) {
+    if (S.t !== "all" && D.test_y[i] !== +S.t) continue;
+    if (S.p !== "all" && pred[i] !== +S.p) continue;
+    if (S.bad && pred[i] === D.test_y[i]) continue;
+    if (conf[i] > S.maxc + 1e-9) continue;
+    if (shown >= 400) break;
+    shown++;
+    const d = document.createElement("div"); d.className = "tile" + (pred[i] !== D.test_y[i] ? " bad" : "") + (S.sel === i ? " sel" : "");
+    const cv = document.createElement("canvas"); cv.width = 8; cv.height = 8; paint(cv, D.test_x[i]);
+    d.appendChild(cv); d.appendChild(document.createTextNode(`${D.test_y[i]}→${pred[i]} ${Math.round(100 * conf[i])}%`));
+    d.onclick = () => { S.sel = i; showBars(i); render(); };
+    g.appendChild(d);
+  }
+  let total = 0;
+  for (let i = 0; i < nTest; i++) if ((S.t === "all" || D.test_y[i] === +S.t) && (S.p === "all" || pred[i] === +S.p) && (!S.bad || pred[i] !== D.test_y[i]) && conf[i] <= S.maxc + 1e-9) total++;
+  document.getElementById("count").textContent = `${total} image${total === 1 ? "" : "s"}${total > 400 ? " (first 400 shown)" : ""}`;
+  drawCM();
+}
+function showBars(i) {
+  const p = D.test_p[i], top = pred[i];
+  document.getElementById("bars").innerHTML = `<div class="small">Image #${i}: true ${D.test_y[i]}, predicted ${top}</div>` +
+    p.map((v, k) => `<div class="bar"><span>${k}</span><i class="${k === top ? "top" : ""}" style="width:${Math.max(1, 100 * v)}%"></i><span>${(100 * v).toFixed(1)}%</span></div>`).join("");
+}
+["fTrue", "fPred"].forEach(id => { const s = document.getElementById(id); for (let k = 0; k < 10; k++) s.insertAdjacentHTML("beforeend", `<option>${k}</option>`); });
+document.getElementById("fTrue").onchange = e => { S.t = e.target.value; render(); };
+document.getElementById("fPred").onchange = e => { S.p = e.target.value; render(); };
+document.querySelectorAll("#seg button").forEach(b => b.onclick = () => { document.querySelectorAll("#seg button").forEach(x => x.classList.remove("on")); b.classList.add("on"); S.bad = b.dataset.v === "bad"; render(); });
+document.getElementById("fConf").oninput = e => { S.maxc = e.target.value / 100; document.getElementById("confV").textContent = e.target.value + "%"; render(); };
+// ---------------------------------------------------------------- draw-a-digit with k-NN
+const pad = document.getElementById("pad"), pg = pad.getContext("2d");
+let drawing = false, last = null;
+function clearPad() { pg.fillStyle = "#fff"; pg.fillRect(0, 0, 256, 256); document.getElementById("guess").textContent = "-"; document.getElementById("vote").textContent = "Draw something to classify."; document.getElementById("nbrs").innerHTML = ""; paint(document.getElementById("seen"), new Array(64).fill(0)); }
+function pos(e) { const r = pad.getBoundingClientRect(); return [(e.clientX - r.left) * 256 / r.width, (e.clientY - r.top) * 256 / r.height]; }
+pad.addEventListener("pointerdown", e => { drawing = true; last = pos(e); pad.setPointerCapture(e.pointerId); });
+pad.addEventListener("pointermove", e => { if (!drawing) return; const p = pos(e); pg.strokeStyle = "#000"; pg.lineCap = "round"; pg.lineJoin = "round"; pg.lineWidth = +document.getElementById("pen").value; pg.beginPath(); pg.moveTo(...last); pg.lineTo(...p); pg.stroke(); last = p; });
+pad.addEventListener("pointerup", () => { drawing = false; classify(); });
+document.getElementById("clear").onclick = clearPad;
+function classify() {
+  const src = pg.getImageData(0, 0, 256, 256).data;
+  let x0 = 256, y0 = 256, x1 = -1, y1 = -1;
+  for (let y = 0; y < 256; y++) for (let x = 0; x < 256; x++) if (src[4 * (y * 256 + x)] < 128) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+  if (x1 < 0) return;
+  // NIST-style normalisation: scale the bounding box to fill the 32 x 32 frame (aspect ratio not preserved)
+  const bits = new Array(1024).fill(0);
+  for (let r = 0; r < 32; r++) for (let c = 0; c < 32; c++) {
+    const sx = Math.floor(x0 + (c + 0.5) * (x1 - x0 + 1) / 32), sy = Math.floor(y0 + (r + 0.5) * (y1 - y0 + 1) / 32);
+    bits[r * 32 + c] = src[4 * (sy * 256 + sx)] < 128 ? 1 : 0;
+  }
+  const v = new Array(64).fill(0);
+  for (let r = 0; r < 32; r++) for (let c = 0; c < 32; c++) v[(r >> 2) * 8 + (c >> 2)] += bits[r * 32 + c];
+  paint(document.getElementById("seen"), v);
+  const dist = D.train_x.map((t, i) => { let s = 0; for (let k = 0; k < 64; k++) { const d = t[k] - v[k]; s += d * d; } return [s, i]; });
+  dist.sort((a, b) => a[0] - b[0]);
+  const nn = dist.slice(0, 3), votes = new Array(10).fill(0);
+  nn.forEach(([, i]) => votes[D.train_y[i]]++);
+  const best = votes.indexOf(Math.max(...votes));
+  document.getElementById("guess").textContent = best;
+  document.getElementById("vote").textContent = `${votes[best]} of 3 nearest neighbours say ${best}`;
+  const box = document.getElementById("nbrs"); box.innerHTML = "";
+  nn.forEach(([, i]) => { const c = document.createElement("canvas"); c.width = 8; c.height = 8; c.className = "thumb"; c.title = "label " + D.train_y[i]; paint(c, D.train_x[i]); box.appendChild(c); });
+}
+clearPad(); render(); showBars(pred.findIndex((p, i) => p !== D.test_y[i]));
+</script>
+</body>
+</html>
